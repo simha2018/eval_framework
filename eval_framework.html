@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gen AI Eval Framework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09090f; --s1: #0f1019; --s2: #141523; --b1: #1b1e30; --b2: #252840;
+  --t1: #e8eaf6; --t2: #7b82ad; --t3: #3d4166;
+  --amber: #f9a825; --blue: #5b8ef9; --green: #43d97f; --red: #f56565;
+  --purple: #b48af7; --cyan: #22d3ee; --pink: #f472b6; --orange: #fb923c; --teal: #2dd4bf;
+  --fn: 'DM Sans', sans-serif; --fm: 'JetBrains Mono', monospace; --fd: 'Syne', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--t1); font-family:var(--fn); font-size:14px; line-height:1.6; min-height:100vh; }
+
+/* LAYOUT */
+.app { display:flex; flex-direction:column; height:100vh; }
+.header { padding:20px 28px 0; border-bottom:1px solid var(--b1); flex-shrink:0; }
+.header-row { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:16px; }
+.logo { font-family:var(--fd); font-size:22px; font-weight:800; letter-spacing:-.3px; }
+.logo em { color:var(--amber); font-style:normal; }
+.meta { font-size:12px; color:var(--t2); margin-top:3px; }
+.badge { font-family:var(--fm); font-size:11px; background:rgba(249,168,37,.1); border:1px solid rgba(249,168,37,.25); color:var(--amber); padding:3px 9px; border-radius:4px; }
+.tabs { display:flex; gap:0; overflow-x:auto; scrollbar-width:none; padding:0; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { display:flex; align-items:center; gap:6px; padding:10px 15px; font-size:13px; font-weight:500; color:var(--t2); cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; transition:all .18s; user-select:none; }
+.tab:hover { color:var(--t1); }
+.tab.active { color:var(--t1); border-bottom-color:var(--tab-ac, var(--amber)); }
+.tab-dot { width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.7; flex-shrink:0; }
+
+.content { padding:24px 28px; flex:1; overflow-y:auto; }
+.pane { display:none; }
+.pane.active { display:block; }
+
+/* OVERVIEW */
+.ov-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+.ov-stat { background:var(--s1); border:1px solid var(--b1); border-radius:10px; padding:14px; }
+.ov-n { font-size:28px; font-weight:500; font-family:var(--fd); }
+.ov-l { font-size:12px; color:var(--t2); margin-top:3px; }
+.legend { display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--s1); border:1px solid var(--b1); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--t2); margin-bottom:18px; }
+.legend strong { color:var(--t2); margin-right:4px; font-weight:500; }
+.ov-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.ov-card { background:var(--s1); border:1px solid var(--b1); border-radius:12px; padding:16px; cursor:pointer; transition:transform .2s, box-shadow .2s, border-color .2s; position:relative; overflow:hidden; }
+.ov-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--oc-ac); }
+.ov-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.5); border-color:var(--b2); }
+.oc-icon { font-size:22px; margin-bottom:10px; }
+.oc-name { font-family:var(--fd); font-size:13px; font-weight:700; margin-bottom:4px; }
+.oc-desc { font-size:12px; color:var(--t2); line-height:1.45; }
+.oc-count { position:absolute; top:12px; right:14px; font-family:var(--fm); font-size:10px; color:var(--t3); }
+
+/* CATEGORY */
+.cat-head { display:flex; gap:12px; align-items:flex-start; margin-bottom:20px; padding-bottom:18px; border-bottom:1px solid var(--b1); }
+.cat-bar { width:4px; min-height:52px; border-radius:2px; flex-shrink:0; margin-top:3px; }
+.cat-title { font-family:var(--fd); font-size:20px; font-weight:800; margin-bottom:4px; }
+.cat-desc { font-size:13px; color:var(--t2); max-width:560px; line-height:1.55; }
+.cat-stats { display:flex; gap:16px; margin-top:8px; font-size:12px; color:var(--t2); }
+.cat-stats strong { color:var(--t1); font-family:var(--fm); }
+.filter-bar { display:flex; gap:6px; margin-bottom:16px; }
+.fb { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--b2); background:none; color:var(--t2); cursor:pointer; transition:all .15s; font-family:var(--fn); }
+.fb:hover { color:var(--t1); border-color:var(--t3); }
+.fb.sel { background:var(--b2); color:var(--t1); border-color:var(--b2); }
+
+/* METRICS GRID */
+.mgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:22px; }
+.mc { background:var(--s1); border:1px solid var(--b1); border-radius:10px; padding:14px; transition:border-color .2s, background .2s; }
+.mc:hover { border-color:var(--b2); background:var(--s2); }
+.mc.hidden { display:none; }
+.mc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:8px; }
+.mc-name { font-family:var(--fm); font-size:11.5px; font-weight:500; color:var(--t1); word-break:break-word; line-height:1.3; }
+.pri { font-size:9px; font-weight:500; padding:2px 6px; border-radius:3px; flex-shrink:0; font-family:var(--fm); text-transform:uppercase; }
+.pH { background:rgba(245,101,101,.12); color:#f56565; border:1px solid rgba(245,101,101,.2); }
+.pM { background:rgba(249,168,37,.12); color:#f9a825; border:1px solid rgba(249,168,37,.2); }
+.pL { background:rgba(91,142,249,.12); color:#5b8ef9; border:1px solid rgba(91,142,249,.2); }
+.mc-desc { font-size:12px; color:var(--t2); line-height:1.5; margin-bottom:8px; }
+.formula { font-family:var(--fm); font-size:11px; color:var(--t2); background:rgba(0,0,0,.3); border-left:2px solid var(--b2); border-radius:0 4px 4px 0; padding:6px 9px; margin-bottom:8px; line-height:1.45; }
+.tags { display:flex; gap:4px; flex-wrap:wrap; }
+.tag { font-size:10px; font-family:var(--fm); padding:1px 6px; border-radius:3px; }
+.ta { background:rgba(67,217,127,.1); color:#43d97f; }
+.tm { background:rgba(91,142,249,.1); color:#5b8ef9; }
+.th2 { background:rgba(249,168,37,.1); color:#f9a825; }
+.tl { background:rgba(249,168,37,.1); color:#f9a825; }
+.tt { background:rgba(255,255,255,.04); border:1px solid var(--b1); color:var(--t3); }
+
+/* BOTTOM */
+.bottom { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.bc { background:var(--s1); border:1px solid var(--b1); border-radius:10px; padding:16px; }
+.bt { font-family:var(--fd); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--t2); margin-bottom:12px; }
+.tools { display:flex; flex-wrap:wrap; gap:6px; }
+.tool { font-size:12px; font-family:var(--fm); padding:3px 10px; border-radius:20px; background:var(--s2); border:1px solid var(--b2); color:var(--t2); }
+.steps { display:flex; flex-direction:column; gap:10px; }
+.step { display:flex; gap:9px; align-items:flex-start; }
+.sn { width:18px; height:18px; border-radius:50%; background:var(--s2); border:1px solid var(--b2); font-family:var(--fm); font-size:10px; display:flex; align-items:center; justify-content:center; color:var(--t3); flex-shrink:0; margin-top:1px; }
+.st { font-size:12px; color:var(--t2); line-height:1.5; }
+
+/* RESULTS TAB */
+.drop-zone { border:2px dashed var(--b2); border-radius:12px; padding:52px 32px; text-align:center; cursor:pointer; transition:border-color .2s, background .2s; margin-bottom:12px; }
+.drop-zone:hover, .drop-zone.drag-over { border-color:var(--cyan); background:rgba(34,211,238,.03); }
+.dz-icon { font-size:40px; margin-bottom:14px; }
+.dz-title { font-family:var(--fd); font-size:17px; font-weight:700; margin-bottom:6px; }
+.dz-sub { font-size:13px; color:var(--t2); line-height:1.55; }
+.dz-btn { display:inline-block; margin-top:16px; padding:8px 20px; background:var(--b2); border:1px solid var(--t3); border-radius:6px; color:var(--t1); font-size:13px; cursor:pointer; transition:background .15s; font-family:var(--fn); }
+.dz-btn:hover { background:var(--b1); }
+.dz-hint { font-size:11px; color:var(--t3); margin-top:10px; font-family:var(--fm); }
+
+.res-actions { display:flex; gap:8px; margin-bottom:16px; align-items:center; }
+.res-act-btn { font-size:12px; padding:5px 13px; border-radius:6px; border:1px solid var(--b2); background:var(--s1); color:var(--t2); cursor:pointer; transition:all .15s; font-family:var(--fn); }
+.res-act-btn:hover { color:var(--t1); border-color:var(--t3); background:var(--s2); }
+.res-run-label { font-family:var(--fm); font-size:11px; color:var(--t3); margin-left:auto; }
+
+.res-header { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; background:var(--s1); border:1px solid var(--b1); border-radius:10px; padding:18px 22px; margin-bottom:18px; }
+.res-meta-row { display:flex; gap:22px; flex-wrap:wrap; font-size:12px; color:var(--t2); margin-bottom:4px; }
+.res-meta-row strong { color:var(--t1); font-family:var(--fm); }
+.res-score-block { text-align:right; }
+.res-score-num { font-family:var(--fd); font-size:38px; font-weight:800; line-height:1; }
+.res-score-label { font-size:11px; color:var(--t2); margin-top:4px; }
+.res-badge { display:inline-block; font-family:var(--fm); font-size:11px; padding:3px 10px; border-radius:4px; margin-top:6px; font-weight:500; }
+.rb-pass { background:rgba(67,217,127,.12); border:1px solid rgba(67,217,127,.3); color:#43d97f; }
+.rb-fail { background:rgba(245,101,101,.12); border:1px solid rgba(245,101,101,.3); color:#f56565; }
+
+.dim-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:22px; }
+.dim-summary-card { background:var(--s1); border:1px solid var(--b1); border-radius:12px; padding:16px; position:relative; overflow:hidden; cursor:pointer; transition:transform .18s, box-shadow .18s; }
+.dim-summary-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--dc-ac); }
+.dim-summary-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.dsc-name { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--t2); margin-bottom:10px; font-family:var(--fm); }
+.dsc-score { font-family:var(--fd); font-size:28px; font-weight:800; line-height:1; margin-bottom:6px; }
+.dsc-bar-track { background:var(--b2); border-radius:4px; height:4px; margin-bottom:8px; }
+.dsc-bar-fill { height:4px; border-radius:4px; }
+.dsc-meta { display:flex; justify-content:space-between; font-size:10px; font-family:var(--fm); color:var(--t3); }
+
+.metrics-section { margin-bottom:10px; border-radius:10px; overflow:hidden; border:1px solid var(--b1); }
+.ms-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--s1); cursor:pointer; user-select:none; transition:background .15s; }
+.ms-head:hover { background:var(--s2); }
+.ms-title { font-family:var(--fd); font-size:13px; font-weight:700; display:flex; align-items:center; gap:10px; }
+.ms-dim-badge { font-family:var(--fm); font-size:10px; color:var(--t3); font-weight:400; }
+.ms-right { display:flex; align-items:center; gap:10px; }
+.ms-score-chip { font-family:var(--fm); font-size:11px; padding:2px 8px; border-radius:4px; font-weight:500; }
+.ms-toggle { font-size:10px; color:var(--t3); transition:transform .2s; display:inline-block; }
+.ms-toggle.open { transform:rotate(180deg); }
+.ms-body { display:none; border-top:1px solid var(--b1); }
+.ms-body.open { display:block; }
+.mr-header-row { display:grid; grid-template-columns:180px 120px 70px 1fr; gap:12px; padding:6px 16px; background:rgba(0,0,0,.2); font-size:10px; font-family:var(--fm); color:var(--t3); text-transform:uppercase; letter-spacing:.5px; }
+.metric-row { display:grid; grid-template-columns:180px 120px 70px 1fr; gap:12px; align-items:start; padding:11px 16px; border-top:1px solid var(--b1); transition:background .15s; }
+.metric-row:first-of-type { border-top:none; }
+.metric-row:hover { background:var(--s2); }
+.mr-name { font-family:var(--fm); font-size:11.5px; color:var(--t1); padding-top:2px; }
+.mr-bar-col { display:flex; flex-direction:column; gap:4px; padding-top:4px; }
+.mr-bar-track { background:var(--b2); border-radius:3px; height:3px; }
+.mr-bar-fill { height:3px; border-radius:3px; }
+.mr-score-val { font-family:var(--fm); font-size:11px; font-weight:500; }
+.mr-badge { font-family:var(--fm); font-size:9px; padding:2px 7px; border-radius:3px; font-weight:500; display:inline-block; }
+.mr-reasoning { font-size:11.5px; color:var(--t2); line-height:1.55; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.mc { animation:fadeUp .25s ease backwards; }
+.dim-summary-card { animation:fadeUp .3s ease backwards; }
+.metrics-section { animation:fadeUp .25s ease backwards; }
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+  <div class="header-row">
+    <div>
+      <div class="logo">Gen AI <em>Eval</em> Framework</div>
+      <div class="meta">8 evaluation dimensions &middot; 56 metrics &middot; Enterprise Gen AI</div>
+    </div>
+    <span class="badge">v1.0</span>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div class="content" id="content"></div>
+</div>
+
+<script>
+const CATS = [
+{id:'llm',label:'LLM Quality',icon:'&#10022;',ac:'#b48af7',
+ desc:'Core quality metrics for the language model\'s raw output, evaluated independently of the surrounding pipeline.',
+ tools:['HELM (Stanford)','LM-Eval Harness','TruLens','DeepEval','PromptFlow'],
+ qs:['Build a golden test set of 200 real query-answer pairs as your evaluation baseline',
+     'Automate correctness scoring using LLM-as-judge with a strong reference model (e.g. GPT-4o)',
+     'Run weekly regression tests after every model version change to detect drift early'],
+ metrics:[
+  {n:'correctness',d:'Factual accuracy vs a ground truth reference — how often the model gives a fully correct answer.',f:'Correct responses / total responses',p:'H',t:['auto','llm-judge']},
+  {n:'hallucination_rate',d:'Fraction of factual claims in the output not supported by source context or verifiable knowledge.',f:'Unsupported claims / all factual claims',p:'H',t:['hybrid','llm-judge']},
+  {n:'instruction_following',d:'How well outputs satisfy all constraints in the prompt — format, length, tone, scope, and exclusion rules.',f:'Constraints met / total constraints per response',p:'H',t:['auto','llm-judge']},
+  {n:'reasoning_quality',d:'Step-level accuracy in chain-of-thought tasks. Catches models that reach correct answers via flawed logic.',f:'Correct CoT steps / total reasoning steps',p:'M',t:['hybrid','llm-judge']},
+  {n:'calibration',d:'Alignment between expressed confidence and actual accuracy. Well-calibrated models know what they don\'t know.',f:'ECE = &Sigma;|accuracy &minus; confidence| per confidence bucket',p:'M',t:['auto']},
+  {n:'consistency',d:'Stability of outputs to semantically identical inputs across N runs. High variance signals unreliable generation.',f:'1 &minus; semantic similarity variance across N runs',p:'M',t:['auto']},
+  {n:'toxicity_and_bias',d:'Rate at which outputs contain harmful, biased, or sensitive content — critical for enterprise compliance.',f:'Flagged outputs / total outputs',p:'H',t:['auto','tool: Perspective API']},
+ ]},
+{id:'rag',label:'RAG Pipeline',icon:'&#11041;',ac:'#5b8ef9',
+ desc:'End-to-end evaluation of your retrieval-augmented generation stack, from retrieval quality through to final answer faithfulness.',
+ tools:['RAGAS','TruLens-RAG','DeepEval','LangSmith','Phoenix (Arize)'],
+ qs:['Start with RAGAS faithfulness + context precision — these two capture 80% of RAG failure modes',
+     'Build a Q&A test set: each question has a ground-truth answer and a set of relevant document chunks',
+     'Fix retrieval quality (precision/recall) first before optimising generation faithfulness'],
+ metrics:[
+  {n:'context_precision',d:'Of all chunks retrieved, what fraction are actually relevant? Directly measures retrieval noise.',f:'Relevant retrieved chunks / total retrieved chunks',p:'H',t:['auto','tool: RAGAS']},
+  {n:'context_recall',d:'Did retrieval capture all information needed? Low recall means answers will be systematically incomplete.',f:'Relevant chunks retrieved / all relevant chunks in corpus',p:'H',t:['auto','tool: RAGAS']},
+  {n:'faithfulness',d:'Are all claims in the generated answer grounded in the retrieved context? The primary RAG-specific hallucination metric.',f:'Grounded claims / all claims in output',p:'H',t:['auto','llm-judge','tool: RAGAS']},
+  {n:'answer_relevance',d:'Does the generated answer semantically address what the user asked? Catches verbose or off-topic responses.',f:'Semantic similarity(answer, question)',p:'H',t:['auto','tool: RAGAS']},
+  {n:'answer_correctness',d:'End-to-end factual accuracy of the final answer against a known ground truth, combining precision and recall.',f:'F1(extracted answer facts, ground truth facts)',p:'H',t:['auto','tool: RAGAS']},
+  {n:'context_utilization',d:'How much retrieved context did the model actually reference? Low utilization signals poor prompt-context integration.',f:'Referenced tokens / total context tokens',p:'M',t:['auto']},
+  {n:'chunk_boundary_quality',d:'Are chunk boundaries semantically coherent? Poor chunking is the most common root cause of low context recall.',f:'LLM coherence score per chunk boundary',p:'M',t:['manual','llm-judge']},
+ ]},
+{id:'prompt',label:'Prompt Quality',icon:'&#9998;',ac:'#2dd4bf',
+ desc:'Evaluate robustness, efficiency, and reliability of the prompts that drive behavior across your entire system.',
+ tools:['PromptBench','PromptFoo','LangSmith','OpenAI Evals','DSPy'],
+ qs:['Version-control all system prompts — every change must pass an eval gate before reaching production',
+     'Paraphrase each critical prompt 10 ways and measure performance variance; fragile prompts break in prod',
+     'Set a format compliance threshold (e.g. >98% valid JSON) as a hard CI/CD gate for structured outputs'],
+ metrics:[
+  {n:'prompt_robustness',d:'Performance stability when the same instruction is phrased differently. Fragile prompts fail unpredictably at scale.',f:'Std deviation of metric X across N semantically equivalent prompts',p:'H',t:['auto','tool: PromptBench']},
+  {n:'format_compliance',d:'What fraction of outputs match the expected schema? Critical for downstream parsing in any agentic pipeline.',f:'Parseable / valid outputs / total outputs',p:'H',t:['auto']},
+  {n:'instruction_adherence',d:'Rate at which all explicit prompt constraints are satisfied simultaneously — format + tone + scope.',f:'All-constraints-met responses / total responses',p:'H',t:['auto','llm-judge']},
+  {n:'injection_resistance',d:'How well the prompt resists adversarial inputs that attempt to override system-level instructions.',f:'Blocked injection attempts / total injection attempts',p:'H',t:['auto','tool: Garak']},
+  {n:'token_efficiency',d:'Output quality per input token consumed. Verbose prompts waste money and context window at scale.',f:'Quality score / total input tokens',p:'M',t:['auto']},
+  {n:'few_shot_lift',d:'Performance gain from adding few-shot examples over zero-shot. Measures whether examples actually help.',f:'Score(few-shot) &minus; Score(zero-shot)',p:'M',t:['auto']},
+  {n:'ab_prompt_winner',d:'Systematic A/B comparison of prompt variants to find the highest-performing version for each task type.',f:'Metric delta + statistical significance (p &lt; 0.05)',p:'H',t:['auto','tool: LangSmith']},
+ ]},
+{id:'agent',label:'Agent Behavior',icon:'&#9654;',ac:'#f9a825',
+ desc:'Evaluate individual agents in your LangGraph architecture for task completion, tool use accuracy, and step-level efficiency.',
+ tools:['AgentBench','TauBench','LangSmith','WebArena','Custom harness'],
+ qs:['Start with task_completion_rate + tool_selection_accuracy — these two catch 80% of agent failure modes',
+     'Log every tool call with full input/output via LangSmith traces; you cannot eval what you cannot observe',
+     'Build 50+ real task scenarios per specialized agent — synthetic tasks miss production failure patterns'],
+ metrics:[
+  {n:'task_completion_rate',d:'Fraction of assigned tasks the agent fully and correctly completes end-to-end. The primary success metric.',f:'Fully completed tasks / total tasks',p:'H',t:['auto','manual']},
+  {n:'tool_selection_accuracy',d:'Did the agent call the right tool for each step? Wrong tool calls cascade into downstream task failures.',f:'Correct tool calls / total tool calls',p:'H',t:['auto','tool: LangSmith']},
+  {n:'step_efficiency',d:'How close to optimal is the agent\'s solution path? Measures unnecessary detours and redundant tool calls.',f:'Optimal steps / actual steps taken',p:'M',t:['auto']},
+  {n:'error_recovery_rate',d:'After a tool error or unexpected output, does the agent self-correct and continue toward the goal?',f:'Successful recoveries / total error events',p:'H',t:['auto']},
+  {n:'hallucinated_actions',d:'Calling non-existent tools, wrong parameters, or fabricating API responses — catastrophic in production.',f:'Invalid actions / total actions',p:'H',t:['auto','tool: LangSmith']},
+  {n:'context_retention',d:'Does the agent correctly carry forward relevant state and prior results across a multi-step task?',f:'Correctly retained context items / total context items',p:'M',t:['hybrid']},
+  {n:'goal_decomposition_quality',d:'How well the agent breaks a high-level goal into the correct and complete set of sub-tasks before executing.',f:'Correct sub-tasks / all required sub-tasks',p:'M',t:['llm-judge','manual']},
+ ]},
+{id:'multi',label:'Multi-Agent',icon:'&#11042;',ac:'#fb923c',
+ desc:'Evaluate your LangGraph orchestration layer — routing accuracy, coordination, and end-to-end coherence across ~20 specialized agents.',
+ tools:['LangSmith','Custom LangGraph eval','Phoenix (Arize)','OpenTelemetry','PromptFlow'],
+ qs:['Instrument every LangGraph node and edge with trace IDs — routing evals require complete observability first',
+     'Create a routing eval: 100 queries &times; expected target agent; measure routing accuracy as your first metric',
+     'Build 20+ complex multi-hop scenarios requiring 3+ agents to cooperate as your end-to-end test suite'],
+ metrics:[
+  {n:'agent_routing_accuracy',d:'Did the orchestrator route to the correct specialist agent? The single most critical orchestration metric.',f:'Correct routing decisions / total routing decisions',p:'H',t:['auto','tool: LangSmith']},
+  {n:'e2e_task_success',d:'End-to-end task completion across the full agent graph, including all handoffs and synthesis steps.',f:'Successful end-to-end tasks / total tasks',p:'H',t:['auto','manual']},
+  {n:'inter_agent_handoff_quality',d:'Completeness and correctness of state/context passed from one agent to the next at each handoff point.',f:'Complete + correct handoffs / total handoffs',p:'H',t:['auto']},
+  {n:'parallel_execution_integrity',d:'In parallel paths, do agents avoid race conditions, conflicting writes, or state corruption?',f:'Clean parallel runs / total parallel runs',p:'M',t:['auto']},
+  {n:'orchestrator_overhead',d:'Latency added purely by routing/orchestration, above the sum of individual agent latencies.',f:'Total latency &minus; &Sigma;(individual agent latencies)',p:'M',t:['auto','tool: LangSmith']},
+  {n:'loop_and_cycle_detection',d:'What fraction of runaway agent loops are caught and halted before exhausting the token or step budget?',f:'Detected + halted loops / total loop incidents',p:'H',t:['auto']},
+  {n:'consensus_accuracy',d:'When multiple agents are consulted for the same query, is the synthesized final answer correct and coherent?',f:'Correct consensus answers / total multi-agent consultations',p:'M',t:['llm-judge','auto']},
+ ]},
+{id:'kg',label:'Knowledge Graph',icon:'&#9672;',ac:'#f472b6',
+ desc:'Evaluate quality, completeness, and query accuracy of your KG layer — a unique architectural component that deserves its own eval suite.',
+ tools:['Custom eval suite','KGQA benchmarks','spaCy NER eval','REBEL','NetworkX'],
+ qs:['Start with entity precision/recall on a 500-entity hand-labeled gold set from your own domain corpus',
+     'Measure KG query accuracy independently from vector retrieval to isolate each mode\'s strengths by query type',
+     'Track graph completeness monthly: define ~100 must-have domain concepts and check coverage each sprint'],
+ metrics:[
+  {n:'entity_precision',d:'Of all entities extracted by the KG pipeline, what fraction are genuinely valid domain entities?',f:'Correct extracted entities / all extracted entities',p:'H',t:['auto']},
+  {n:'entity_recall',d:'Of all real entities that should exist in the KG, what fraction was actually captured during extraction?',f:'Captured entities / all ground-truth entities',p:'H',t:['auto']},
+  {n:'relation_accuracy',d:'Are the subject-predicate-object triples in the graph factually correct per the source documents?',f:'Correct triples / total extracted triples',p:'H',t:['auto','manual']},
+  {n:'graph_completeness',d:'Coverage of the domain concept space — does the KG include all concepts needed for target use cases?',f:'Covered domain concepts / total required domain concepts',p:'M',t:['manual']},
+  {n:'kg_query_accuracy',d:'When a SPARQL or Cypher query runs against the KG, does it return factually correct and complete answers?',f:'Correct KG query answers / total KG queries',p:'H',t:['auto']},
+  {n:'schema_adherence',d:'Do extracted facts conform to the defined ontology? Violations corrupt graph structure and query reliability.',f:'Schema-conformant triples / total triples',p:'M',t:['auto']},
+  {n:'kg_vs_vector_delta',d:'When does KG retrieval outperform vector search and vice versa? Drives optimal hybrid routing decisions.',f:'&Delta; accuracy(KG, vector) per query type category',p:'L',t:['auto']},
+ ]},
+{id:'safety',label:'Safety',icon:'&#9679;',ac:'#f56565',
+ desc:'Validate that your Gen AI products are safe, enterprise-compliant, and resilient to misuse — with zero tolerance for critical failures.',
+ tools:['Garak','Microsoft PyRIT','Presidio (PII)','Guardrails AI','LlamaGuard'],
+ qs:['Run Garak\'s full probe suite on every model version or system prompt change before any deployment',
+     'Add Presidio or equivalent PII detection on all model outputs in the production pipeline as a first gate',
+     'Define explicit enterprise policy rules and automate violation detection with a dedicated guardrails layer'],
+ metrics:[
+  {n:'jailbreak_resistance',d:'Fraction of adversarial jailbreak attempts (role-play, hypothetical, encoded) successfully blocked.',f:'Blocked attempts / total jailbreak attempts',p:'H',t:['auto','tool: Garak']},
+  {n:'pii_leakage_rate',d:'Fraction of responses exposing PII from user inputs, retrieved documents, or training data — compliance critical.',f:'PII-containing outputs / total outputs',p:'H',t:['auto','tool: Presidio']},
+  {n:'policy_violation_rate',d:'Rate at which outputs violate enterprise content policies — confidentiality, regulatory scope, acceptable use.',f:'Policy-violating outputs / total outputs',p:'H',t:['auto','manual']},
+  {n:'over_refusal_rate',d:'How often the safety layer blocks legitimate, benign requests. Over-restriction destroys user experience.',f:'False positive refusals / total benign requests',p:'H',t:['auto']},
+  {n:'prompt_injection_passthrough',d:'Adversarial instructions embedded in retrieved docs or tool outputs that override system behavior.',f:'Successful injections / total injection attempts',p:'H',t:['auto','tool: Garak']},
+  {n:'data_leakage_rate',d:'Sensitive data (system prompts, other users\' data) appearing in outputs — critical for multi-tenant deployments.',f:'Leakage events / total outputs',p:'H',t:['auto']},
+  {n:'attack_surface_consistency',d:'Behavioral consistency under semantically equivalent adversarial rephrasing. Inconsistency is exploitable.',f:'Consistent responses / adversarial rephrase variants',p:'M',t:['auto']},
+ ]},
+{id:'perf',label:'System Perf',icon:'&#9889;',ac:'#43d97f',
+ desc:'Operational metrics for production health — latency, throughput, cost, and reliability that directly affect user experience and ROI.',
+ tools:['LangSmith','Prometheus + Grafana','OpenTelemetry','k6','DataDog'],
+ qs:['Set SLOs from day one: P99 latency &le; 8 s, error rate &le; 0.5%, availability &ge; 99.5%',
+     'Instrument every LLM call + tool call with OpenTelemetry spans — accurate cost tracking needs per-call token logs',
+     'Build a cost-per-query dashboard by agent and use case — this drives optimization decisions early'],
+ metrics:[
+  {n:'response_latency_p99',d:'99th percentile end-to-end response time — what your worst-case user experiences, not the mean.',f:'Time from request to final output token, P99',p:'H',t:['auto','tool: LangSmith']},
+  {n:'throughput',d:'Requests processed per second at peak load — determines system capacity ceiling and scaling trigger points.',f:'Completed requests / second at peak load',p:'H',t:['auto']},
+  {n:'cost_per_query',d:'All-in cost per user query: LLM tokens + retrieval infrastructure + KG queries. The key unit economics metric.',f:'($LLM tokens + $retrieval + $infra) / queries',p:'H',t:['auto']},
+  {n:'token_efficiency',d:'Ratio of useful output tokens to total tokens consumed. High input waste signals over-stuffed prompts at scale.',f:'Output tokens / (input + output tokens)',p:'M',t:['auto']},
+  {n:'semantic_cache_hit_rate',d:'Fraction of queries served from a semantic cache — each hit eliminates LLM latency and cost entirely.',f:'Cache hits / total queries',p:'M',t:['auto']},
+  {n:'error_rate',d:'Fraction of requests resulting in system errors, timeouts, or empty responses. Tracks overall reliability.',f:'Failed requests / total requests',p:'H',t:['auto','tool: Prometheus']},
+  {n:'agent_cold_start_latency',d:'Time for first response after idle period — relevant for LangGraph agents that initialize tools on first call.',f:'Time from cold request to first token delivered',p:'L',t:['auto']},
+ ]},
+];
+
+const TAG_CLS = {auto:'ta',manual:'tm',hybrid:'th2','llm-judge':'tl'};
+function tagCls(t){ return 'tag '+(t.startsWith('tool:')?'tt':(TAG_CLS[t]||'tt')); }
+function priCls(p){ return p==='H'?'pH':p==='M'?'pM':'pL'; }
+function priLabel(p){ return p==='H'?'HIGH':p==='M'?'MED':'LOW'; }
+
+function buildMetric(m, i){
+  return `<div class="mc" data-pri="${m.p}" style="animation-delay:${i*45}ms">
+<div class="mc-top"><span class="mc-name">${m.n}</span><span class="pri ${priCls(m.p)}">${priLabel(m.p)}</span></div>
+<div class="mc-desc">${m.d}</div>
+<div class="formula">${m.f}</div>
+<div class="tags">${m.t.map(t=>`<span class="${tagCls(t)}">${t}</span>`).join('')}</div>
+</div>`;
+}
+
+function buildCat(cat){
+  const hc = cat.metrics.filter(m=>m.p==='H').length;
+  return `<div class="cat-head">
+<div class="cat-bar" style="background:${cat.ac}"></div>
+<div>
+<div class="cat-title">${cat.icon} ${cat.label}</div>
+<div class="cat-desc">${cat.desc}</div>
+<div class="cat-stats">
+<span><strong>${cat.metrics.length}</strong> metrics</span>
+<span style="color:#f56565"><strong>${hc}</strong> high priority</span>
+<span><strong>${cat.metrics.length-hc}</strong> med / low</span>
+</div></div></div>
+<div class="filter-bar">
+<button class="fb sel" onclick="filter(this,'all')">All</button>
+<button class="fb" onclick="filter(this,'H')">High priority</button>
+<button class="fb" onclick="filter(this,'M')">Medium</button>
+<button class="fb" onclick="filter(this,'L')">Low</button>
+</div>
+<div class="mgrid">${cat.metrics.map((m,i)=>buildMetric(m,i)).join('')}</div>
+<div class="bottom">
+<div class="bc"><div class="bt">Recommended tools</div><div class="tools">${cat.tools.map(t=>`<span class="tool">${t}</span>`).join('')}</div></div>
+<div class="bc"><div class="bt">Quick start</div><div class="steps">${cat.qs.map((s,i)=>`<div class="step"><div class="sn">${i+1}</div><div class="st">${s}</div></div>`).join('')}</div></div>
+</div>`;
+}
+
+function buildOverview(){
+  const total = CATS.reduce((a,c)=>a+c.metrics.length,0);
+  const high = CATS.reduce((a,c)=>a+c.metrics.filter(m=>m.p==='H').length,0);
+  const cards = CATS.map(c=>{
+    return `<div class="ov-card" style="--oc-ac:${c.ac}" onclick="switchTab('${c.id}')">
+<div class="oc-count">${c.metrics.length} metrics</div>
+<div class="oc-icon">${c.icon}</div>
+<div class="oc-name">${c.label}</div>
+<div class="oc-desc">${c.desc.substring(0,70)}&hellip;</div>
+</div>`;
+  }).join('');
+  return `<div class="ov-stats">
+<div class="ov-stat"><div class="ov-n">8</div><div class="ov-l">Eval dimensions</div></div>
+<div class="ov-stat"><div class="ov-n">${total}</div><div class="ov-l">Total metrics</div></div>
+<div class="ov-stat"><div class="ov-n" style="color:#f56565">${high}</div><div class="ov-l">High priority</div></div>
+<div class="ov-stat"><div class="ov-n">${total-high}</div><div class="ov-l">Med / Low</div></div>
+</div>
+<div class="legend">
+<strong>Tag legend:</strong>
+<span class="tag ta">auto</span> fully automated &nbsp;
+<span class="tag tm">manual</span> human review &nbsp;
+<span class="tag th2">hybrid</span> auto + human &nbsp;
+<span class="tag tl">llm-judge</span> LLM-as-judge &nbsp;
+<span class="tag tt">tool: X</span> specific tooling
+</div>
+<div class="ov-grid">${cards}</div>`;
+}
+
+// ── Build tabs and panes ──────────────────────────────────────────────────────
+const tabsEl = document.getElementById('tabs');
+const contentEl = document.getElementById('content');
+
+const ovTab = document.createElement('div');
+ovTab.className='tab active'; ovTab.style.setProperty('--tab-ac','#f9a825');
+ovTab.dataset.id='overview';
+ovTab.innerHTML='<span class="tab-dot"></span>Overview';
+ovTab.onclick=()=>switchTab('overview');
+tabsEl.appendChild(ovTab);
+
+CATS.forEach(c=>{
+  const t=document.createElement('div');
+  t.className='tab'; t.style.setProperty('--tab-ac',c.ac);
+  t.dataset.id=c.id;
+  t.innerHTML=`<span class="tab-dot"></span>${c.label}`;
+  t.onclick=()=>switchTab(c.id);
+  tabsEl.appendChild(t);
+});
+
+// Results tab
+const resTab = document.createElement('div');
+resTab.className='tab';
+resTab.style.setProperty('--tab-ac','#22d3ee');
+resTab.dataset.id='results';
+resTab.innerHTML='<span class="tab-dot"></span>&#128202; Results';
+resTab.onclick=()=>switchTab('results');
+tabsEl.appendChild(resTab);
+
+// Overview pane
+const ovPane=document.createElement('div');
+ovPane.className='pane active'; ovPane.id='pane-overview';
+ovPane.innerHTML=buildOverview();
+contentEl.appendChild(ovPane);
+
+CATS.forEach(c=>{
+  const p=document.createElement('div');
+  p.className='pane'; p.id=`pane-${c.id}`;
+  p.innerHTML=buildCat(c);
+  contentEl.appendChild(p);
+});
+
+// Results pane
+const resPane=document.createElement('div');
+resPane.className='pane'; resPane.id='pane-results';
+resPane.innerHTML=buildDropZone();
+contentEl.appendChild(resPane);
+
+// ── Tab / filter logic ────────────────────────────────────────────────────────
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.id===id));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  document.getElementById('pane-'+id).querySelectorAll('.mc').forEach((m,i)=>{
+    m.style.animation='none'; m.offsetHeight;
+    m.style.animation=`fadeUp .25s ease ${i*40}ms backwards`;
+  });
+}
+
+function filter(btn,pri){
+  const grid=btn.closest('.pane').querySelector('.mgrid');
+  grid.querySelectorAll('.mc').forEach(c=>c.classList.toggle('hidden',pri!=='all'&&c.dataset.pri!==pri));
+  btn.closest('.filter-bar').querySelectorAll('.fb').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+// ── Results tab logic ─────────────────────────────────────────────────────────
+const DIM_COLORS = {
+  llm_quality:'#b48af7', rag_pipeline:'#5b8ef9', rag:'#5b8ef9',
+  prompt_quality:'#2dd4bf', prompt:'#2dd4bf',
+  agent_behavior:'#f9a825', agent:'#f9a825',
+  multi_agent:'#fb923c', knowledge_graph:'#f472b6', kg:'#f472b6',
+  safety:'#f56565', system_performance:'#43d97f', perf:'#43d97f',
+};
+
+function dimColor(name){ return DIM_COLORS[name] || '#7b82ad'; }
+function scoreColor(s){ return s>=.8?'#43d97f':s>=.7?'#f9a825':s>=.5?'#fb923c':'#f56565'; }
+function pct(s){ return (s*100).toFixed(1)+'%'; }
+
+function buildDropZone(){
+  return `<div class="drop-zone" id="drop-zone"
+    onclick="document.getElementById('res-file-in').click()"
+    ondragover="event.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="handleResultsDrop(event)">
+  <div class="dz-icon">&#128202;</div>
+  <div class="dz-title">Drop your results.json here</div>
+  <div class="dz-sub">Run your eval, save the report, then load it here to see scores.<br>Supports any EvalReport generated by this framework.</div>
+  <div class="dz-btn">Browse file</div>
+  <input type="file" id="res-file-in" accept=".json" style="display:none" onchange="handleResultsFile(this.files[0])">
+</div>
+<div class="dz-hint">Generate with: &nbsp;<code>from genai_eval.reporters.report import save_json &nbsp;&nbsp; save_json(report)</code></div>
+<div style="margin-top:28px;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:18px 20px;">
+  <div class="bt" style="margin-bottom:14px;">Quick example to generate a results file</div>
+  <pre style="font-family:var(--fm);font-size:11.5px;color:var(--t2);line-height:1.8;overflow-x:auto"><span style="color:var(--purple)">from</span> genai_eval <span style="color:var(--purple)">import</span> EvalHarness, EvalConfig, PromptQualityInput
+<span style="color:var(--purple)">from</span> genai_eval.reporters.report <span style="color:var(--purple)">import</span> save_json
+
+harness = EvalHarness(EvalConfig())
+
+report = harness.evaluate(prompt=[
+    PromptQualityInput(
+        prompt=<span style="color:var(--green)">"Summarize Q2 status and return JSON with keys: summary, risk"</span>,
+        response=your_agent_response,
+        format_spec=<span style="color:var(--green)">"JSON with keys: summary, risk"</span>,
+    )
+])
+
+save_json(report, <span style="color:var(--green)">"results.json"</span>)  <span style="color:var(--t3)"># drop this file above</span></pre>
+</div>`;
+}
+
+function handleResultsDrop(e){
+  e.preventDefault();
+  document.getElementById('drop-zone') && document.getElementById('drop-zone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f) handleResultsFile(f);
+}
+
+function handleResultsFile(f){
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      renderResults(data, f.name);
+    } catch(ex) {
+      alert('Could not parse JSON: ' + ex.message);
+    }
+  };
+  reader.readAsText(f);
+}
+
+function renderResults(data, filename){
+  const pane = document.getElementById('pane-results');
+  const overall = data.overall_score || 0;
+  const dims = data.dimension_reports || [];
+  const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : '—';
+
+  const dimCards = dims.map((dr, i) => {
+    const ac = dimColor(dr.dimension);
+    const sc = scoreColor(dr.overall_score);
+    return `<div class="dim-summary-card" style="--dc-ac:${ac};animation-delay:${i*60}ms"
+      onclick="toggleSection('ms-${i}');document.getElementById('ms-${i}').scrollIntoView({behavior:'smooth',block:'nearest'})">
+      <div class="dsc-name">${dr.dimension.replace(/_/g,' ')}</div>
+      <div class="dsc-score" style="color:${sc}">${pct(dr.overall_score)}</div>
+      <div class="dsc-bar-track"><div class="dsc-bar-fill" style="width:${pct(dr.overall_score)};background:${sc}"></div></div>
+      <div class="dsc-meta">
+        <span>${dr.num_samples} result${dr.num_samples!==1?'s':''}</span>
+        <span style="color:${dr.passed?'#43d97f':'#f56565'};font-weight:600">${dr.passed?'PASS':'FAIL'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const sections = dims.map((dr, i) => buildMetricSection(dr, i)).join('');
+
+  pane.innerHTML = `
+  <div class="res-actions">
+    <button class="res-act-btn" onclick="document.getElementById('pane-results').innerHTML=buildDropZone()">&#8592; Load different file</button>
+    <span class="res-run-label">${filename || 'results.json'}</span>
+  </div>
+  <div class="res-header">
+    <div>
+      <div class="res-meta-row">
+        <span>Run&nbsp;<strong>${data.run_id || '—'}</strong></span>
+        <span>Judge&nbsp;<strong>${data.judge_provider || ''}/${data.judge_model || ''}</strong></span>
+        <span>Time&nbsp;<strong>${ts}</strong></span>
+        <span>Dimensions&nbsp;<strong>${dims.length}</strong></span>
+      </div>
+    </div>
+    <div class="res-score-block">
+      <div class="res-score-num" style="color:${scoreColor(overall)}">${pct(overall)}</div>
+      <div class="res-score-label">Overall Score</div>
+      <div class="res-badge ${data.passed?'rb-pass':'rb-fail'}">${data.passed?'&#10003; PASS':'&#10007; FAIL'}</div>
+    </div>
+  </div>
+  <div class="dim-summary-grid">${dimCards}</div>
+  <div style="font-family:var(--fd);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t2);margin-bottom:10px;">Metric Detail</div>
+  ${sections}`;
+}
+
+function buildMetricSection(dr, i){
+  const id = 'ms-' + i;
+  const ac = dimColor(dr.dimension);
+  const sc = scoreColor(dr.overall_score);
+
+  const rows = (dr.metric_results || []).map(r => {
+    const rc = scoreColor(r.score);
+    return `<div class="metric-row">
+      <div class="mr-name">${r.metric}</div>
+      <div class="mr-bar-col">
+        <div class="mr-bar-track"><div class="mr-bar-fill" style="width:${pct(r.score)};background:${rc}"></div></div>
+        <div class="mr-score-val" style="color:${rc}">${r.score.toFixed(2)}</div>
+      </div>
+      <div><span class="mr-badge ${r.passed?'rb-pass':'rb-fail'}">${r.passed?'PASS':'FAIL'}</span></div>
+      <div class="mr-reasoning">${r.reasoning || '—'}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="metrics-section" style="animation-delay:${i*50}ms">
+    <div class="ms-head" onclick="toggleSection('${id}')">
+      <div class="ms-title">
+        <span style="color:${ac};font-size:10px">&#9632;</span>
+        ${dr.dimension.replace(/_/g,' ')}
+        <span class="ms-dim-badge">${(dr.metric_results||[]).length} metrics</span>
+      </div>
+      <div class="ms-right">
+        <span class="ms-score-chip" style="color:${sc};background:${sc}18;border:1px solid ${sc}33">${pct(dr.overall_score)}</span>
+        <span class="ms-badge ${dr.passed?'rb-pass':'rb-fail'}" style="font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:3px">${dr.passed?'PASS':'FAIL'}</span>
+        <span class="ms-toggle" id="tog-${id}">&#9660;</span>
+      </div>
+    </div>
+    <div class="ms-body" id="${id}">
+      <div class="mr-header-row"><div>Metric</div><div>Score</div><div>Status</div><div>Judge Reasoning</div></div>
+      ${rows}
+    </div>
+  </div>`;
+}
+
+function toggleSection(id){
+  const body = document.getElementById(id);
+  if(!body) return;
+  const tog = document.getElementById('tog-' + id);
+  const isOpen = body.classList.toggle('open');
+  if(tog) tog.classList.toggle('open', isOpen);
+}
+</script>
+</body>
+</html>
